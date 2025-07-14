@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Salon Booking</title>
+</head>
+<body>
+  <h2>Salon Booking</h2>
+
+  <input type="text" id="serviceInput" placeholder="Enter service (e.g., Haircut)" />
+  <button id="bookBtn">Book Now</button>
+
+  <p id="status"></p>
+
+  <!-- Load ethers.js -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
+  <!-- Your booking script -->
+  <script>
+    document.getElementById("bookBtn").addEventListener("click", bookService);
+
+    // ✅ Replace with your contract details
+    const contractAddress = "0x8e2684C447150070D691447e6Cb99e37CD71889D";
+    const abi = [
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "service",
+				"type": "string"
+			}
+		],
+		"name": "addBooking",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "bookings",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "client",
+				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "service",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getTotalBookings",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+];
+
+    async function bookService() {
+      const status = document.getElementById("status");
+      const service = document.getElementById("serviceInput").value;
+
+      if (!window.ethereum) {
+        status.textContent = "MetaMask not detected.";
+        return;
+      }
+
+      try {
+        await ethereum.request({ method: "eth_requestAccounts" });
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const contract = new ethers.Contract(contractAddress, abi, signer);
+
+        status.textContent = "Booking... please wait ⏳";
+
+        const tx = await contract.addBooking(service);
+        await tx.wait();
+
+        status.textContent = `✅ Booking confirmed. Tx Hash: ${tx.hash}`;
+      } catch (error) {
+        console.error(error);
+        status.textContent = `❌ Error: ${error.message}`;
+      }
+    }
+  </script>
+</body>
+</html>

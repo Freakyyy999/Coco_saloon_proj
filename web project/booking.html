@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Book a Salon Service</title>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f9f9f9;
+      padding: 30px;
+    }
+    .container {
+      max-width: 400px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      width: 100%;
+      cursor: pointer;
+    }
+    p {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Book Your Service</h2>
+<select id="service">
+  <option value="Haircut">Haircut</option>
+  <option value="Braiding">Braiding</option>
+  <option value="Facial">Facial</option>
+  <option value="Massage">Massage</option>
+</select>
+
+<!-- Add Time Slot -->
+<select id="time">
+  <option value="9:00 AM">9:00 AM</option>
+  <option value="10:00 AM">10:00 AM</option>
+  <option value="11:00 AM">11:00 AM</option>
+  <option value="12:00 PM">12:00 PM</option>
+  <option value="1:00 PM">1:00 PM</option>
+  <option value="2:00 PM">2:00 PM</option>
+  <option value="3:00 PM">3:00 PM</option>
+  <option value="4:00 PM">4:00 PM</option>
+  <option value="5:00 PM">5:00 PM</option>
+</select>
+
+<!-- Add Service Crew -->
+<select id="crew">
+  <option value="Angela">Angela</option>
+  <option value="Moses">Moses</option>
+  <option value="Tasha">Tasha</option>
+  <option value="Kevin">Kevin</option>
+</select>
+
+<button onclick="bookService()">Book Now</button>
+<p id="status"></p>
+
+  </div>
+
+  <script>
+    // Firebase
+    firebase.auth().onAuthStateChanged(user => {
+  if (!user) {
+    window.location.href = "login.html";
+  }
+});
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDzHOG3bTaYNXYda2BOnMXm2Qlb5hYJCTY",
+      authDomain: "salonbookingapp-8cd89.firebaseapp.com",
+      projectId: "salonbookingapp-8cd89",
+      storageBucket: "salonbookingapp-8cd89.firebasestorage.app",
+      messagingSenderId: "388843880543",
+      appId: "1:388843880543:web:0d5e73f4f64ba9e51b9bea"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    // Smart Contract
+    const contractAddress = "0x9B9d0078C555ceb0b5F7f567B836d05f0275eFBe";
+    const contractABI = [
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "service",
+            "type": "string"
+          }
+        ],
+        "name": "addBooking",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "getTotalBookings",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ];
+
+   async function bookService() {
+  const status = document.getElementById("status");
+  const service = document.getElementById("service").value;
+  const time = document.getElementById("time").value;
+  const crew = document.getElementById("crew").value;
+
+  if (!window.ethereum) {
+    status.innerText = "MetaMask not detected";
+    return;
+  }
+
+  try {
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const contract = new ethers.Contract(contractAddress, contractABI, signer);
+
+    const bookingSummary = `${service} at ${time} with ${crew}`;
+    const tx = await contract.addBooking(bookingSummary);
+
+    status.innerText = "Booking sent, waiting for confirmation...";
+    await tx.wait();
+    status.innerText = "✅ Booking confirmed on blockchain!";
+  } catch (err) {
+    console.error(err);
+    status.innerText = "❌ Error: " + err.message;
+  }
+}
+
+  </script>
+
+</body>
+</html>
