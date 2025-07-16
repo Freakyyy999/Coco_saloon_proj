@@ -3,91 +3,151 @@
 <head>
   <meta charset="UTF-8" />
   <title>Admin Panel - Bookings</title>
+
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f0f0f5;
-      padding: 20px;
+      font-family: sans-serif;
+      background: #f0f4ff;
+      padding: 40px;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th, td {
-      padding: 12px;
-      border: 1px solid #ccc;
-      text-align: left;
-    }
-    th {
-      background: #333;
-      color: white;
+    .admin-box {
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.1);
     }
     h2 {
-      color: #444;
+      text-align: center;
+      color: #333;
+    }
+    .booking-list {
+      margin-top: 20px;
+    }
+    .booking {
+      border: 1px solid #ccc;
+      border-left: 5px solid #4CAF50;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+      background: #f9f9f9;
+    }
+    button {
+      background-color: #e53935;
+      color: white;
+      padding: 10px;
+      border: none;
+      margin-top: 20px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
+  <div class="admin-box">
+    <h2>Admin Dashboard</h2>
+    <p id="admin-info">Checking admin status...</p>
+    <p id="booking-count">Loading bookings...</p>
 
-  <h2>All Bookings (Admin View)</h2>
-  <table id="bookingTable">
-    <thead>
-      <tr>
-        <th>Wallet</th>
-        <th>Service</th>
-        <th>Time</th>
-        <th>Crew</th>
-        <th>Timestamp</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+    <div class="booking-list" id="booking-list">Fetching booking details...</div>
+
+    <button onclick="logout()">Logout</button>
+  </div>
 
   <script>
-    firebase.auth().onAuthStateChanged(user => {
-  if (!user) {
-    window.location.href = "login.html";
-  }
-});
-
     const firebaseConfig = {
       apiKey: "AIzaSyDzHOG3bTaYNXYda2BOnMXm2Qlb5hYJCTY",
       authDomain: "salonbookingapp-8cd89.firebaseapp.com",
       projectId: "salonbookingapp-8cd89",
-      storageBucket: "salonbookingapp-8cd89.firebasestorage.app",
+      storageBucket: "salonbookingapp-8cd89.appspot.com",
       messagingSenderId: "388843880543",
       appId: "1:388843880543:web:0d5e73f4f64ba9e51b9bea"
     };
 
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    const auth = firebase.auth();
 
-    async function loadBookings() {
-      const tableBody = document.querySelector("#bookingTable tbody");
-      const snapshot = await db.collection("bookings").orderBy("timestamp", "desc").get();
+    const contractAddress = "0x58B39FB478e5725d516805379505c45c71d3420a"; // ✅ updated contract
+    const contractABI = [
+      {
+        "inputs": [],
+        "name": "getTotalBookings",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [{ "internalType": "uint256", "name": "index", "type": "uint256" }],
+        "name": "getBooking",
+        "outputs": [
+          { "internalType": "address", "name": "client", "type": "address" },
+          { "internalType": "string", "name": "service", "type": "string" },
+          { "internalType": "string", "name": "bookedTime", "type": "string" },
+          { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ];
 
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const row = document.createElement("tr");
+    async function connectContract() {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      return new ethers.Contract(contractAddress, contractABI, signer);
+    }
 
-        row.innerHTML = `
-          <td>${data.user}</td>
-          <td>${data.service}</td>
-          <td>${data.time}</td>
-          <td>${data.crew}</td>
-          <td>${new Date(data.timestamp).toLocaleString()}</td>
+    async function loadAllBookings(contract) {
+      const total = await contract.getTotalBookings();
+      document.getElementById("booking-count").innerText = `📊 Total Bookings: ${total}`;
+      let html = "";
+
+      for (let i = 0; i < total; i++) {
+        const [client, service, bookedTime, timestamp] = await contract.getBooking(i);
+        const date = new Date(timestamp * 1000).toLocaleString();
+
+        html += `
+          <div class="booking">
+            <strong>Client:</strong> ${client}<br>
+            <strong>Service:</strong> ${service}<br>
+            <strong>Booked Time:</strong> ${bookedTime}<br>
+            <small><em>Submitted On:</em> ${date}</small>
+          </div>
         `;
+      }
 
-        tableBody.appendChild(row);
+      document.getElementById("booking-list").innerHTML = html || "No bookings yet.";
+    }
+
+    function logout() {
+      auth.signOut().then(() => {
+        window.location.href = "login.html";
       });
     }
 
-    loadBookings();
-  </script>
+    window.addEventListener("DOMContentLoaded", async () => {
+      const adminEmail = "admin@salon.com";
 
+      auth.onAuthStateChanged(async (user) => {
+        if (user) {
+          if (user.email === adminEmail) {
+            document.getElementById("admin-info").innerText = `✅ Logged in as Admin: ${user.email}`;
+            const contract = await connectContract();
+            loadAllBookings(contract);
+          } else {
+            alert("❌ Access Denied. Redirecting...");
+            window.location.href = "dashboard.html";
+          }
+        } else {
+          window.location.href = "login.html";
+        }
+      });
+    });
+  </script>
 </body>
 </html>
+
+

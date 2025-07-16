@@ -1,48 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Salon Dashboard</title>
+
+  <!-- Firebase & Ethers.js -->
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
-  <link href="https://fonts.googleapis.com/css?family=Inter&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
   <style>
     body {
-      font-family: 'Inter', sans-serif;
-      background-color: #f9f9f9;
-      padding: 30px;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      padding: 40px;
     }
-    h1 {
-      color: #333;
-    }
-    .container {
-      max-width: 600px;
+
+    .dashboard {
+      max-width: 500px;
       margin: auto;
       background: white;
-      border-radius: 15px;
       padding: 25px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-    button {
-      background: #ff4081;
-      color: white;
-      border: none;
-      padding: 12px 20px;
-      margin-top: 20px;
-      cursor: pointer;
+
+    h2, h3 {
+      text-align: center;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
       border-radius: 5px;
+    }
+
+    button {
+      border: none;
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+    }
+
+    #logout {
+      background-color: #e53935;
+      margin-top: 20px;
+    }
+
+    .booking-item {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 6px;
+      background-color: #f9f9f9;
+    }
+
+    .status {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Welcome to Salon Booking</h1>
-    <p id="user-email"></p>
-    <button onclick="logout()">Logout</button>
+
+  <div class="dashboard">
+    <h2>Book Your Appointment</h2>
+    <p id="status" class="status">Checking login...</p>
+
+    <input type="text" id="service" placeholder="Service (e.g. Haircut)" required />
+    <input type="datetime-local" id="bookedTime" required />
+    <button onclick="makeBooking()">Book Now</button>
+    <button id="logout" onclick="logout()">Logout</button>
+
+    <h3>Your Bookings</h3>
+    <div id="bookingList">Loading...</div>
   </div>
 
   <script>
-    // ✅ 1. Define config first
+    // ✅ Firebase Config
     const firebaseConfig = {
       apiKey: "AIzaSyDzHOG3bTaYNXYda2BOnMXm2Qlb5hYJCTY",
       authDomain: "salonbookingapp-8cd89.firebaseapp.com",
@@ -52,26 +89,136 @@
       appId: "1:388843880543:web:0d5e73f4f64ba9e51b9bea"
     };
 
-    // ✅ 2. Initialize Firebase once
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
 
-    // ✅ 3. Get UID and show email
+    // 🔐 Auth Check
     auth.onAuthStateChanged((user) => {
       if (user) {
-        console.log("My UID:", user.uid); // You'll use this UID in Firestore
-        document.getElementById("user-email").innerText = "Logged in as: " + user.email;
+        document.getElementById("status").innerText = "Welcome, " + user.email;
       } else {
         window.location.href = "login.html";
       }
     });
 
+    // 🚪 Logout
     function logout() {
       auth.signOut().then(() => {
         window.location.href = "login.html";
       });
     }
+
+    // 🔗 Smart Contract Config
+    const contractAddress = "0x58B39FB478e5725d516805379505c45c71d3420a";
+    const contractABI = [
+      {
+        "inputs": [
+          { "internalType": "string", "name": "service", "type": "string" },
+          { "internalType": "string", "name": "bookedTime", "type": "string" }
+        ],
+        "name": "addBooking",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "getTotalBookings",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [{ "internalType": "uint256", "name": "index", "type": "uint256" }],
+        "name": "getBooking",
+        "outputs": [
+          { "internalType": "address", "name": "client", "type": "address" },
+          { "internalType": "string", "name": "service", "type": "string" },
+          { "internalType": "string", "name": "bookedTime", "type": "string" },
+          { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ];
+
+    // 📅 Submit Booking
+    async function makeBooking() {
+      const service = document.getElementById("service").value;
+      const bookedTime = document.getElementById("bookedTime").value;
+
+      if (!window.ethereum) {
+        alert("Please install MetaMask to book.");
+        return;
+      }
+
+      try {
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const contract = new ethers.Contract(contractAddress, contractABI, signer);
+
+        const tx = await contract.addBooking(service, bookedTime);
+        await tx.wait();
+
+        alert("✅ Booking confirmed!");
+        document.getElementById("service").value = "";
+        document.getElementById("bookedTime").value = "";
+
+        loadBookings(); // refresh list
+      } catch (err) {
+        console.error("Booking failed:", err);
+        alert("❌ Error: " + (err.message || "Unknown error"));
+      }
+    }
+
+    // 📜 Load Existing Bookings for Current Wallet
+    async function loadBookings() {
+      try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const currentAddress = await signer.getAddress();
+
+        const contract = new ethers.Contract(contractAddress, contractABI, provider);
+        const total = await contract.getTotalBookings();
+
+        let html = "";
+        for (let i = 0; i < total; i++) {
+          const [client, service, bookedTime, timestamp] = await contract.getBooking(i);
+          if (client.toLowerCase() !== currentAddress.toLowerCase()) continue;
+
+          const formattedDate = new Date(timestamp * 1000).toLocaleString();
+          html += `
+            <div class="booking-item">
+              <strong>Service:</strong> ${service}<br>
+              <strong>Time:</strong> ${bookedTime}<br>
+              <small><em>Booked on:</em> ${formattedDate}</small>
+            </div>
+          `;
+        }
+
+        document.getElementById("bookingList").innerHTML = html || "No bookings yet.";
+      } catch (err) {
+        console.error("Error loading bookings:", err);
+        document.getElementById("bookingList").innerText = "Could not load bookings.";
+      }
+    }
+
+    // Load bookings after MetaMask access
+    window.addEventListener("load", async () => {
+      if (window.ethereum) {
+        try {
+          await window.ethereum.request({ method: "eth_requestAccounts" });
+          loadBookings();
+        } catch (e) {
+          document.getElementById("bookingList").innerText = "Please connect MetaMask.";
+        }
+      } else {
+        document.getElementById("bookingList").innerText = "MetaMask not installed.";
+      }
+    });
   </script>
 </body>
 </html>
+
 

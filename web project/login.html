@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Salon Login</title>
+  <title>Login - Salon</title>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
   <style>
@@ -18,18 +18,23 @@
       background: white;
       border-radius: 10px;
     }
-    input {
+    input, button {
       width: 100%;
       padding: 10px;
-      margin: 5px 0;
+      margin-top: 10px;
     }
     button {
-      padding: 10px;
-      width: 100%;
       background-color: #ff4081;
       color: white;
       border: none;
       cursor: pointer;
+    }
+    p {
+      text-align: center;
+    }
+    a {
+      color: #ff4081;
+      text-decoration: none;
     }
   </style>
 </head>
@@ -41,14 +46,15 @@
     <input type="password" id="password" placeholder="Password" />
     <button onclick="login()">Login</button>
     <p id="message"></p>
+    <p>Don’t have an account? <a href="signup.html">Create one</a></p>
   </div>
 
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyDzHOG3bTaYNXYda2BOnMXm2Qlb5hYJCTY",
-      authDomain: "https://salonbookingapp-8cd89.firebaseapp.com/",
+      authDomain: "salonbookingapp-8cd89.firebaseapp.com",
       projectId: "salonbookingapp-8cd89",
-      storageBucket: "https://salonbookingapp-8cd89.firebasestorage.app/",
+      storageBucket: "salonbookingapp-8cd89.appspot.com",
       messagingSenderId: "388843880543",
       appId: "1:388843880543:web:0d5e73f4f64ba9e51b9bea"
     };
@@ -62,8 +68,12 @@
 
       auth.signInWithEmailAndPassword(email, password)
         .then((userCredential) => {
-          document.getElementById("message").innerText = "Login successful!";
-          window.location.href = "dashboard.html"; // Redirect to salon dashboard
+          const user = userCredential.user;
+          if (user.email === "admin@salon.com") {
+            window.location.href = "admin.html";
+          } else {
+            window.location.href = "dashboard.html";
+          }
         })
         .catch((error) => {
           document.getElementById("message").innerText = error.message;
@@ -72,3 +82,6 @@
   </script>
 </body>
 </html>
+
+
+
